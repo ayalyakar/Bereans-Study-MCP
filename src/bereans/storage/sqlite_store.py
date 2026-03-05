@@ -58,8 +58,14 @@ class SQLiteStore:
         return self._conn.execute(sql, params)
 
     def insert_document(
-        self, title, source_type, source_path, file_format,
-        content_full, content_hash, metadata,
+        self,
+        title: str,
+        source_type: str,
+        source_path: str,
+        file_format: str,
+        content_full: str,
+        content_hash: str,
+        metadata: dict,
     ) -> str | None:
         doc_id = uuid.uuid4().hex
         now = datetime.now(timezone.utc).isoformat()

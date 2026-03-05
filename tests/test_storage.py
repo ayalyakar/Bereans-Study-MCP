@@ -10,7 +10,8 @@ def store(tmp_path):
     db_path = tmp_path / "test.db"
     s = SQLiteStore(db_path)
     s.initialize()
-    return s
+    yield s
+    s.close()
 
 
 def test_initialize_creates_tables(store):
@@ -99,6 +100,18 @@ def test_get_stats(store):
     stats = store.get_stats()
     assert stats["total_documents"] == 1
     assert stats["by_format"]["pdf"] == 1
+
+
+def test_count_documents(store):
+    for i in range(4):
+        store.insert_document(
+            title=f"Doc {i}", source_type="file" if i < 2 else "url",
+            source_path=f"/doc{i}", file_format="pdf" if i < 3 else "txt",
+            content_full=f"content {i}", content_hash=f"count_hash_{i}", metadata={},
+        )
+    assert store.count_documents() == 4
+    assert store.count_documents(source_type="file") == 2
+    assert store.count_documents(file_format="txt") == 1
 
 
 def test_get_document_by_hash(store):
