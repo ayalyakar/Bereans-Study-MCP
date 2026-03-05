@@ -24,8 +24,11 @@ class SearchEngine:
         if not query or not query.strip():
             return {"results": [], "total_sources_searched": 0}
 
-        embedder = self._get_embedder()
-        query_embedding = await embedder.embed_single(query)
+        try:
+            embedder = self._get_embedder()
+            query_embedding = await embedder.embed_single(query)
+        except Exception as e:
+            return {"results": [], "total_sources_searched": 0, "error": f"Embedding service unavailable: {e}"}
 
         where = {}
         if source_type:
@@ -33,14 +36,16 @@ class SearchEngine:
         if file_format:
             where["file_format"] = file_format
 
-        chroma_results = self.vector.query(
-            query_embedding=query_embedding,
-            top_k=top_k,
-            where=where if where else None,
-        )
+        try:
+            chroma_results = self.vector.query(
+                query_embedding=query_embedding,
+                top_k=top_k,
+                where=where if where else None,
+            )
+        except Exception as e:
+            return {"results": [], "total_sources_searched": 0, "error": f"Search service unavailable: {e}"}
 
         results = []
-        seen_docs = set()
         for i, chunk_id in enumerate(chroma_results["ids"][0]):
             metadata = chroma_results["metadatas"][0][i]
             document_id = metadata.get("document_id")
@@ -50,8 +55,6 @@ class SearchEngine:
             doc = self.sqlite.get_document(document_id)
             if doc is None:
                 continue
-
-            seen_docs.add(document_id)
 
             # Get surrounding context from full text
             context = self._get_context(doc["content_full"], chunk_text)

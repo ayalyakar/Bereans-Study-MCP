@@ -8,7 +8,7 @@ import httpx
 from bereans.config import OLLAMA_HOST, OLLAMA_MODEL, CHUNK_SIZE, CHUNK_OVERLAP
 from bereans.embeddings.ollama import OllamaEmbedder
 from bereans.ingestion.chunker import TextChunker
-from bereans.ingestion.parsers import get_parser, supported_formats
+from bereans.ingestion.parsers import get_parser
 from bereans.storage.sqlite_store import SQLiteStore
 from bereans.storage.vector_store import VectorStore
 
@@ -84,7 +84,7 @@ class IngestionPipeline:
             fmt = "epub"
         elif url.lower().endswith(".docx"):
             fmt = "docx"
-        elif url.lower().endswith((".csv",)):
+        elif url.lower().endswith(".csv"):
             fmt = "csv"
         elif url.lower().endswith(".json") or "application/json" in content_type:
             fmt = "json"
@@ -172,6 +172,10 @@ class IngestionPipeline:
                 "title": title,
             }
         except Exception as e:
-            # Rollback on failure
+            # Rollback on failure — clean up both stores
             self.sqlite.delete_document(doc_id)
+            try:
+                self.vector.delete_by_document_id(doc_id)
+            except Exception:
+                pass  # Best-effort vector cleanup
             return {"status": "error", "message": f"Ingestion failed (rolled back): {e}"}
