@@ -102,10 +102,13 @@ async def list_sources(
         limit: Max results per page (default 20).
         offset: Pagination offset.
     """
-    sources = sqlite_store.list_documents(
-        source_type=source_type, file_format=file_format, limit=limit, offset=offset
-    )
-    total = sqlite_store.count_documents(source_type=source_type, file_format=file_format)
+    try:
+        sources = sqlite_store.list_documents(
+            source_type=source_type, file_format=file_format, limit=limit, offset=offset
+        )
+        total = sqlite_store.count_documents(source_type=source_type, file_format=file_format)
+    except Exception as e:
+        return {"status": "error", "message": f"Database error: {e}"}
     return {"sources": sources, "total_count": total}
 
 
@@ -122,8 +125,18 @@ async def delete_source(document_id: str) -> dict:
     if doc is None:
         return {"status": "error", "message": f"Document not found: {document_id}"}
 
-    vector_deleted = vector_store.delete_by_document_id(document_id)
-    sqlite_deleted = sqlite_store.delete_document(document_id)
+    try:
+        vector_store.delete_by_document_id(document_id)
+    except Exception as e:
+        return {"status": "error", "message": f"Failed to delete vector data: {e}"}
+
+    try:
+        sqlite_deleted = sqlite_store.delete_document(document_id)
+    except Exception as e:
+        return {
+            "status": "partial_failure",
+            "message": f"Vector data deleted but SQLite cleanup failed: {e}",
+        }
 
     return {
         "status": "success",
@@ -139,8 +152,11 @@ async def get_stats() -> dict:
     Returns total documents, chunks, breakdowns by format and source type,
     storage size, and the last ingestion time.
     """
-    stats = sqlite_store.get_stats()
-    stats["vector_chunks"] = vector_store.count()
+    try:
+        stats = sqlite_store.get_stats()
+        stats["vector_chunks"] = vector_store.count()
+    except Exception as e:
+        return {"status": "error", "message": f"Database error: {e}"}
     return stats
 
 
